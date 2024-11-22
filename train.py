@@ -9,6 +9,11 @@ from transformers import Trainer
 # split dataset
 from sklearn.model_selection import train_test_split
 import pandas as pd
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import r2_score
+import math
+
 
 
 cache_path = "/home/ucl/cental/troux/expe/bert/models/hfcache"
@@ -38,20 +43,48 @@ def get_data(namefile):
 
 
 
-
 def preprocess_function(examples):
     label = examples["gold_score_20"] 
     examples = tokenizer(examples["text"], truncation=True, padding="max_length", max_length=256)
-    examples["label"] = label
+    # Change this to real number
+    examples["label"] = float(label)
     return examples
 
 
+"""
 # metric = load_metric("accuracy")
 metric = evaluate.load("accuracy")
-def compute_metrics(eval_pred):
+def compute_metrics(eval_pred): # for classification
         logits, labels = eval_pred
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
+"""
+
+def compute_metrics_for_regression(eval_pred):
+    logits, labels = eval_pred
+    labels = labels.reshape(-1, 1)
+    
+    mse = mean_squared_error(labels, logits)
+    mae = mean_absolute_error(labels, logits)
+    r2 = r2_score(labels, logits)
+    single_squared_errors = ((logits - labels).flatten()**2).tolist()
+    
+    # Compute accuracy 
+    # Based on the fact that the rounded score = true score only if |single_squared_errors| < 0.5
+    accuracy = sum([1 for e in single_squared_errors if e < 0.25]) / len(single_squared_errors)
+    
+    return {"mse": mse, "mae": mae, "r2": r2, "accuracy": accuracy}
+
+def regression_to_classification_metric(eval_pred): # evaluate the regression as a classification
+    logits, labels = eval_pred
+    predictions = np.round(logits)
+    # convert predictions with this rule : 0 to 5 -> 0, 6 to 10 -> 1, 11 to 15 -> 2, 16 to 20 -> 3
+    predictions = np.where(predictions < 6, 0, np.where(predictions < 11, 1, np.where(predictions < 16, 2, 3)))
+    labels = np.where(labels < 6, 0, np.where(labels < 11, 1, np.where(labels < 16, 2, 3)))
+    return {"accuracy": np.mean(predictions == labels)}
+
+    
+
 
 
 if __name__ == "__main__":
@@ -65,21 +98,17 @@ if __name__ == "__main__":
     BATCH_SIZE = 16
     EPOCHS = 20
 
-    # Let's name the classes 0, 1, 2, 3, 4 like their indices
-    id2label = {k:k for k in range(5)}
-    label2id = {k:k for k in range(5)}
 
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, cache_dir=cache_path)
-    model = AutoModelForSequenceClassification.from_pretrained(BASE_MODEL, id2label=id2label, label2id=label2id, cache_dir=cache_path)
-
+    model = AutoModelForSequenceClassification.from_pretrained(BASE_MODEL, num_labels=1, cache_dir=cache_path)
+    
     # cleaning the full dataset
     ds = {"train": train_ds, "validation": val_ds, "test": test_ds}
     for split in ds:
-        ds[split] = ds[split].map(preprocess_function, remove_columns=["text_indice", "text", "gold_score_20"])
-
+        ds[split] = ds[split].map(preprocess_function, remove_columns=["text_indice", "text", "gold_score_20"]) # only keep input_ids, attention_mask and label (i.e. gold_score_20 as float)
 
     # Training arguments
-        training_args = TrainingArguments(
+    training_args = TrainingArguments(
         output_dir="./models/camembert-fine-tuned-regression",
         learning_rate=LEARNING_RATE,
         per_device_train_batch_size=BATCH_SIZE,
@@ -98,7 +127,26 @@ if __name__ == "__main__":
         args=training_args,
         train_dataset=ds["train"],
         eval_dataset=ds["validation"],
-        compute_metrics=compute_metrics
+        compute_metrics=regression_to_classification_metric,
     )
 
-    trainer.train()
+    # trainer.train()
+
+    # load the best model and evaluate it on the test set
+    print("trainer.evaluate(ds['test']):", trainer.evaluate(ds["test"]))
+
+
+    nb_batches = math.ceil(len(raw_test_ds)/BATCH_SIZE)
+    y_preds = []
+
+    for i in range(nb_batches):
+        input_texts = raw_test_ds[i * BATCH_SIZE: (i+1) * BATCH_SIZE]["text"]
+        input_labels = raw_test_ds[i * BATCH_SIZE: (i+1) * BATCH_SIZE]["score"]
+        encoded = tokenizer(input_texts, truncation=True, padding="max_length", max_length=256, return_tensors="pt").to("cuda")
+        y_preds += model(**encoded).logits.reshape(-1).tolist()
+
+    pd.set_option('display.max_rows', 500)
+    df = pd.DataFrame([raw_test_ds["text"], raw_test_ds["score"], y_preds], ["Text", "Score", "Prediction"]).T
+    df["Rounded Prediction"] = df["Prediction"].apply(round)
+    incorrect_cases = df[df["Score"] != df["Rounded Prediction"]]
+    incorrect_cases
