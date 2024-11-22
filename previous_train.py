@@ -6,41 +6,25 @@ import evaluate
 from transformers import TrainingArguments
 from datasets import Dataset
 from transformers import Trainer
-# split dataset
-from sklearn.model_selection import train_test_split
-import pandas as pd
 
 
 cache_path = "/home/ucl/cental/troux/expe/bert/models/hfcache"
 
 
-def get_data(namefile):
-    # load csv
-    data = Dataset.from_csv(namefile)
-    # only keep columns "text_indice", "text" and "gold_score_20"
-    data = data.select_columns(["text_indice", "text", "gold_score_20"])
-    
-    # Convert to pandas DataFrame
-    df = data.to_pandas()
-    
-    # split the dataset
-    train_df, test_df = train_test_split(df, test_size=0.2)
-    train_df, val_df = train_test_split(train_df, test_size=0.2)
-    
-    # Convert back to Dataset
-    train_ds = Dataset.from_pandas(train_df).remove_columns(["__index_level_0__"])
-    val_ds = Dataset.from_pandas(val_df).remove_columns(["__index_level_0__"])
-    test_ds = Dataset.from_pandas(test_df).remove_columns(["__index_level_0__"])
-    
-    # print(train_ds)
-    # exit()
-    return train_ds, val_ds, test_ds
+def get_data():
+    raw_train_ds = Dataset.from_json("data/sentiments.train.jsonlines")
+    raw_val_ds = Dataset.from_json("data/sentiments.validation.jsonlines")
+    raw_test_ds = Dataset.from_json("data/sentiments.test.jsonlines")
+    print(raw_train_ds)
+    exit()
+    return raw_train_ds, raw_val_ds, raw_test_ds
+
 
 
 
 
 def preprocess_function(examples):
-    label = examples["gold_score_20"] 
+    label = examples["score"] 
     examples = tokenizer(examples["text"], truncation=True, padding="max_length", max_length=256)
     examples["label"] = label
     return examples
@@ -55,8 +39,7 @@ def compute_metrics(eval_pred):
 
 
 if __name__ == "__main__":
-    namefile = "data/Qualtrics_Annotations_corrige.csv"
-    train_ds, val_ds, test_ds = get_data(namefile)
+    raw_train_ds, raw_val_ds, raw_test_ds = get_data()
 
 
     BASE_MODEL = "camembert-base"
@@ -73,9 +56,9 @@ if __name__ == "__main__":
     model = AutoModelForSequenceClassification.from_pretrained(BASE_MODEL, id2label=id2label, label2id=label2id, cache_dir=cache_path)
 
     # cleaning the full dataset
-    ds = {"train": train_ds, "validation": val_ds, "test": test_ds}
+    ds = {"train": raw_train_ds, "validation": raw_val_ds, "test": raw_test_ds}
     for split in ds:
-        ds[split] = ds[split].map(preprocess_function, remove_columns=["text_indice", "text", "gold_score_20"])
+        ds[split] = ds[split].map(preprocess_function, remove_columns=["id", "uuid", "text", "score"])
 
 
     # Training arguments
