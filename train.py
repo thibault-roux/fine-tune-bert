@@ -107,6 +107,30 @@ if __name__ == "__main__":
     for split in ds:
         ds[split] = ds[split].map(preprocess_function, remove_columns=["text_indice", "text", "gold_score_20"]) # only keep input_ids, attention_mask and label (i.e. gold_score_20 as float)
 
+
+
+    
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(1, 3, tight_layout=True)
+    distributions = []
+
+    axs[0].set_title("Train"); axs[1].set_title("Validation"); axs[2].set_title("Test"); 
+    train_distributions = axs[0].hist(raw_train_ds["score"], bins=5)
+    val_distributions = axs[1].hist(raw_val_ds["score"], bins=5)
+    test_distributions = axs[2].hist(raw_test_ds["score"], bins=5)
+
+    for distributions, ax in zip([train_distributions, val_distributions, test_distributions], axs):
+        for j in range(5):
+            # Display the counts on each column of the histograms
+            ax.text(distributions[1][j], distributions[0][j], str(int(distributions[0][j])), weight="bold")
+
+    plt.show()
+    # save
+    plt.savefig("distributions.png")
+    plt.close()
+    exit()
+            
+
     # Training arguments
     training_args = TrainingArguments(
         output_dir="./models/camembert-fine-tuned-regression",
@@ -130,23 +154,26 @@ if __name__ == "__main__":
         compute_metrics=regression_to_classification_metric,
     )
 
-    # trainer.train()
+    trainer.train()
 
     # load the best model and evaluate it on the test set
     print("trainer.evaluate(ds['test']):", trainer.evaluate(ds["test"]))
 
 
-    nb_batches = math.ceil(len(raw_test_ds)/BATCH_SIZE)
+    nb_batches = math.ceil(len(test_ds)/BATCH_SIZE)
     y_preds = []
 
     for i in range(nb_batches):
-        input_texts = raw_test_ds[i * BATCH_SIZE: (i+1) * BATCH_SIZE]["text"]
-        input_labels = raw_test_ds[i * BATCH_SIZE: (i+1) * BATCH_SIZE]["score"]
+        input_texts = test_ds[i * BATCH_SIZE: (i+1) * BATCH_SIZE]["text"]
+        input_labels = test_ds[i * BATCH_SIZE: (i+1) * BATCH_SIZE]["gold_score_20"]
         encoded = tokenizer(input_texts, truncation=True, padding="max_length", max_length=256, return_tensors="pt").to("cuda")
         y_preds += model(**encoded).logits.reshape(-1).tolist()
 
     pd.set_option('display.max_rows', 500)
-    df = pd.DataFrame([raw_test_ds["text"], raw_test_ds["score"], y_preds], ["Text", "Score", "Prediction"]).T
+    df = pd.DataFrame([test_ds["text"], test_ds["gold_score_20"], y_preds], ["Text", "Score", "Prediction"]).T
     df["Rounded Prediction"] = df["Prediction"].apply(round)
-    incorrect_cases = df[df["Score"] != df["Rounded Prediction"]]
-    incorrect_cases
+    print(df)
+    # incorrect_cases = df[df["Score"] != df["Rounded Prediction"]]
+    # print("incorrect_cases:")
+    # print(incorrect_cases)
+    
