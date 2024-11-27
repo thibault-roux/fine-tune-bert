@@ -56,8 +56,8 @@ def tokenize_function(examples):
 
 
 if __name__ == "__main__":
-    # task = 'classification'
-    task = 'regression'
+    task = 'classification'
+    # task = 'regression'
     data_path = '/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv'
     model_name = 'camembert-base'
 
@@ -74,16 +74,20 @@ if __name__ == "__main__":
     model = load_model(task, model_name)
 
 
+    batch_size = 32
     # Training configuration
     training_args = TrainingArguments(
-        output_dir="./results",
+        output_dir="./models",
         eval_strategy="epoch",
+        save_strategy="epoch",
+        metric_for_best_model="accuracy",
+        load_best_model_at_end=True,
         learning_rate=2e-5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        num_train_epochs=3,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+        num_train_epochs=10,
         weight_decay=0.01,
-        save_total_limit=2,
+        # save_total_limit=2,
         logging_dir="./logs",
     )
 
