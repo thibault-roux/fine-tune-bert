@@ -9,12 +9,8 @@ from transformers import Trainer, TrainingArguments
 def load_data(data_path="/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv"):
     # load csv file
     dataset = load_dataset('csv', data_files=data_path)
-    # print(dataset['train'].column_names)
-    # print(dataset['train'][0])
-    # print(type(dataset['train']))
-    # print(len(dataset['train']))
-    # input()
     return dataset
+
 
 
 
