@@ -74,10 +74,6 @@ if __name__ == "__main__":
     model = load_model(task, model_name)
 
 
-    print(tokenized_datasets['train']['labels'][:10])  # Check first 10 labels to verify
-    input()
-
-
     # Training configuration
     training_args = TrainingArguments(
         output_dir="./results",
@@ -110,8 +106,13 @@ if __name__ == "__main__":
     # Train model
     trainer.train()
 
-    # Evaluation
+    # Evaluation on validation
     metrics = trainer.evaluate()
-    print("Results : ", metrics)
+    print("Validation Results : ", metrics)
+
+    # Evaluation on test
+    metrics = trainer.evaluate(test_dataset)
+    print("Test Results : ", metrics)
+
 
 
