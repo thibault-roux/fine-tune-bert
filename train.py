@@ -1,26 +1,34 @@
-from datasets import load_dataset
 from transformers import CamembertTokenizer
 from transformers import CamembertForSequenceClassification
-import torch
+# import torch
+from datasets import load_dataset
 from transformers import Trainer, TrainingArguments
 
 
 
-def load_dataset(data_path="../data/Qualtrics_Annotations_format2.csv"):
+def load_data(data_path="/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv"):
+    import os
+    if not os.path.exists(data_path):
+        print(f"File not found: {data_path}")
+    else:
+        print(f"File exists: {data_path}")
     # load csv file
-    dataset = load_dataset(data_path, data_files=data_path)
+    dataset = load_dataset('csv', data_files=data_path)
     # print(dataset['train'].column_names)
     # print(dataset['train'][0])
+    # print(type(dataset['train']))
+    # print(len(dataset['train']))
+    # input()
     return dataset
 
 
 
 # load CamemBERT
-def load_model(task):
+def load_model(task, model_name):
     if task == 'classification':
-        model = CamembertForSequenceClassification.from_pretrained('camembert-base', num_labels=4)
+        model = CamembertForSequenceClassification.from_pretrained(model_name, num_labels=4)
     elif task == 'regression':
-        model = CamembertForSequenceClassification.from_pretrained('camembert-base', num_labels=1)
+        model = CamembertForSequenceClassification.from_pretrained(model_name, num_labels=1)
     else:
         raise ValueError('task should be either classification or regression')
     return model
@@ -35,7 +43,7 @@ def tokenize_function(examples):
 
 
 if __name__ == "__main__":
-    dataset = load_dataset()
+    dataset = load_data()
 
 
     # Load CamemBERT tokenizer
@@ -44,7 +52,7 @@ if __name__ == "__main__":
     tokenized_datasets = dataset.map(tokenize_function, batched=True)
 
     # Load CamemBERT model
-    model = load_model('classification')
+    model = load_model('classification', 'camembert-base')
 
 
     # Training configuration
@@ -61,9 +69,45 @@ if __name__ == "__main__":
     )
 
     # Data split (will be modified for cross validation)
-    train_test_split = tokenized_datasets['train'].train_test_split(test_size=0.1)
-    train_dataset = train_test_split['train']
-    eval_dataset = train_test_split['test']
+    train_valid_test_split = tokenized_datasets['train'].train_test_split(test_size=0.4)
+    train_dataset = train_valid_test_split['train']
+    valid_test_split = train_valid_test_split['test'].train_test_split(test_size=0.5)
+    eval_dataset = valid_test_split['train']
+    test_dataset = valid_test_split['test']
+
+    print(len(train_dataset))
+    print(len(eval_dataset))
+    print(len(test_dataset))
+    # check if there is overlap
+    for i in range(len(train_dataset)):
+        for j in range(len(eval_dataset)):
+            if train_dataset[i] == eval_dataset[j]:
+                print("Overlap between train and eval")
+                print(i)
+                print(j)
+                print(train_dataset[i])
+                print(eval_dataset[j])
+                input()
+        for j in range(len(test_dataset)):
+            if train_dataset[i] == test_dataset[j]:
+                print("Overlap between train and test")
+                print(i)
+                print(j)
+                print(train_dataset[i])
+                print(test_dataset[j])
+                input()
+    for i in range(len(eval_dataset)):
+        for j in range(len(test_dataset)):
+            if eval_dataset[i] == test_dataset[j]:
+                print("Overlap between eval and test")
+                print(i)
+                print(j)
+                print(eval_dataset[i])
+                print(test_dataset[j])
+                input()
+
+    print("End of overlap checking")
+    exit()
 
     # Trainer
     trainer = Trainer(
