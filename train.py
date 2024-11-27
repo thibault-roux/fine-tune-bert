@@ -7,11 +7,6 @@ from transformers import Trainer, TrainingArguments
 
 
 def load_data(data_path="/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv"):
-    import os
-    if not os.path.exists(data_path):
-        print(f"File not found: {data_path}")
-    else:
-        print(f"File exists: {data_path}")
     # load csv file
     dataset = load_dataset('csv', data_files=data_path)
     # print(dataset['train'].column_names)
