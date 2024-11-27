@@ -1,8 +1,9 @@
 from transformers import CamembertTokenizer
 from transformers import CamembertForSequenceClassification
-# import torch
+import evaluate
 from datasets import load_dataset
 from transformers import Trainer, TrainingArguments
+import numpy as np
 
 
 
@@ -53,6 +54,11 @@ def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
 
 
+metric = evaluate.load("accuracy")
+def compute_metrics(eval_pred): # for classification
+        logits, labels = eval_pred
+        predictions = np.argmax(logits, axis=-1)
+        return metric.compute(predictions=predictions, references=labels)
 
 
 if __name__ == "__main__":
@@ -105,6 +111,7 @@ if __name__ == "__main__":
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
     )
 
     # Train model
