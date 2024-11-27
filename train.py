@@ -8,7 +8,7 @@ from transformers import Trainer, TrainingArguments
 
 def load_dataset(data_path="../data/Qualtrics_Annotations_format2.csv"):
     # load csv file
-    dataset = load_dataset('csv', data_files=data_path)
+    dataset = load_dataset(data_path, data_files=data_path)
     # print(dataset['train'].column_names)
     # print(dataset['train'][0])
     return dataset
@@ -18,7 +18,7 @@ def load_dataset(data_path="../data/Qualtrics_Annotations_format2.csv"):
 # load CamemBERT
 def load_model(task):
     if task == 'classification':
-        model = CamembertForSequenceClassification.from_pretrained('camembert-base', num_labels=3)
+        model = CamembertForSequenceClassification.from_pretrained('camembert-base', num_labels=4)
     elif task == 'regression':
         model = CamembertForSequenceClassification.from_pretrained('camembert-base', num_labels=1)
     else:
