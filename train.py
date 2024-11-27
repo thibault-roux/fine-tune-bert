@@ -25,13 +25,12 @@ def load_data(data_path, task):
     dataset = load_dataset('csv', data_files=data_path)
     if task == 'classification':
         label_column_name = 'gold_score_20_label'
-        dataset = dataset['train'].map(lambda examples: {'labels': int(examples[label_column_name])})
+        dataset = dataset.map(lambda examples: {'labels': label_to_id[examples[label_column_name]]})
     elif task == 'regression':
         label_column_name = 'gold_score_20'
-        dataset = dataset['train'].map(lambda examples: {'labels': float(examples[label_column_name])})
+        dataset = dataset.map(lambda examples: {'labels': float(examples[label_column_name])})
     else:
         raise ValueError('task should be either classification or regression')
-    dataset = dataset['train'].map(lambda examples: {'labels': examples[label_column_name]})
     return dataset
 
 
@@ -57,8 +56,8 @@ def tokenize_function(examples):
 
 
 if __name__ == "__main__":
-    task = 'classification'
-    # task = 'regression'
+    # task = 'classification'
+    task = 'regression'
     data_path = '/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv'
     model_name = 'camembert-base'
 
@@ -75,10 +74,14 @@ if __name__ == "__main__":
     model = load_model(task, model_name)
 
 
+    print(tokenized_datasets['train']['labels'][:10])  # Check first 10 labels to verify
+    input()
+
+
     # Training configuration
     training_args = TrainingArguments(
         output_dir="./results",
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         learning_rate=2e-5,
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
