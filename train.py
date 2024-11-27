@@ -6,9 +6,32 @@ from transformers import Trainer, TrainingArguments
 
 
 
-def load_data(data_path="/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv"):
+label_to_id = {
+            'Très Facile': 0,
+            'Facile': 1,
+            'Accessible': 2,
+            '+Complexe': 3
+        }
+
+id_to_label = {
+    0: 'Très Facile',
+    1: 'Facile',
+    2: 'Accessible',
+    3: '+Complexe'
+}
+
+def load_data(data_path, task):
     # load csv file
     dataset = load_dataset('csv', data_files=data_path)
+    if task == 'classification':
+        label_column_name = 'gold_score_20_label'
+        dataset = dataset['train'].map(lambda examples: {'labels': int(examples[label_column_name])})
+    elif task == 'regression':
+        label_column_name = 'gold_score_20'
+        dataset = dataset['train'].map(lambda examples: {'labels': float(examples[label_column_name])})
+    else:
+        raise ValueError('task should be either classification or regression')
+    dataset = dataset['train'].map(lambda examples: {'labels': examples[label_column_name]})
     return dataset
 
 
@@ -34,16 +57,22 @@ def tokenize_function(examples):
 
 
 if __name__ == "__main__":
-    dataset = load_data()
+    task = 'classification'
+    # task = 'regression'
+    data_path = '/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv'
+    model_name = 'camembert-base'
+
+
+    dataset = load_data(data_path, task)
 
 
     # Load CamemBERT tokenizer
-    tokenizer = CamembertTokenizer.from_pretrained('camembert-base')
+    tokenizer = CamembertTokenizer.from_pretrained(model_name)
     # Appliquer la tokenisation au jeu de données
     tokenized_datasets = dataset.map(tokenize_function, batched=True)
 
     # Load CamemBERT model
-    model = load_model('classification', 'camembert-base')
+    model = load_model(task, model_name)
 
 
     # Training configuration
