@@ -75,40 +75,6 @@ if __name__ == "__main__":
     eval_dataset = valid_test_split['train']
     test_dataset = valid_test_split['test']
 
-    print(len(train_dataset))
-    print(len(eval_dataset))
-    print(len(test_dataset))
-    # check if there is overlap
-    for i in range(len(train_dataset)):
-        for j in range(len(eval_dataset)):
-            if train_dataset[i] == eval_dataset[j]:
-                print("Overlap between train and eval")
-                print(i)
-                print(j)
-                print(train_dataset[i])
-                print(eval_dataset[j])
-                input()
-        for j in range(len(test_dataset)):
-            if train_dataset[i] == test_dataset[j]:
-                print("Overlap between train and test")
-                print(i)
-                print(j)
-                print(train_dataset[i])
-                print(test_dataset[j])
-                input()
-    for i in range(len(eval_dataset)):
-        for j in range(len(test_dataset)):
-            if eval_dataset[i] == test_dataset[j]:
-                print("Overlap between eval and test")
-                print(i)
-                print(j)
-                print(eval_dataset[i])
-                print(test_dataset[j])
-                input()
-
-    print("End of overlap checking")
-    exit()
-
     # Trainer
     trainer = Trainer(
         model=model,
