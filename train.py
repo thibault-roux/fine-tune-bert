@@ -198,7 +198,7 @@ if __name__ == "__main__":
         learning_rate=2e-5,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
-        num_train_epochs=20,
+        num_train_epochs=40,
         weight_decay=0.01,
         # save_total_limit=2,
         logging_dir="./logs",
