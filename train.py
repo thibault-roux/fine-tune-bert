@@ -252,5 +252,4 @@ if __name__ == "__main__":
         print("Predicted label :", str(np.argmax(predictions.predictions[i])), "- True label : ", str(test_dataset['labels'][i]), "\tPrediction :", str(predictions.predictions[i]))
         # predictions.predictions[i] = [-0.19786438  0.15751775  0.16081156 -0.12675774] as a numpy array
 
-
-
+    print("Add print")
