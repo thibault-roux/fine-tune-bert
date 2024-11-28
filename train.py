@@ -94,14 +94,23 @@ def tokenize_function(examples):
 
 
 # evaluate on classification
-metric = evaluate.load("accuracy")
-def compute_metrics(eval_pred): # for classification
+metric_classification = evaluate.load("accuracy")
+def compute_metric_classifications_classification(eval_pred):
         logits, labels = eval_pred
         predictions = np.argmax(logits, axis=-1)
         # print only the first 10 examples
         for i in range(20):
             print("True:", labels[i], "- Predictions:", predictions[i], "- Logits:", logits[i])
-        return metric.compute(predictions=predictions, references=labels)
+        return metric_classification.compute(predictions=predictions, references=labels)
+
+# evaluate on regression
+metric_regression = evaluate.load("spearmanr")
+def compute_metrics_regression(eval_pred):
+        logits, labels = eval_pred
+        # print only the first 10 examples
+        for i in range(20):
+            print("True:", labels[i], "- Predictions:", logits[i])
+        return metrics_regression.compute(predictions=logits, references=labels)
 
 
 # Custom trainer to overwrite the loss function
@@ -179,7 +188,7 @@ if __name__ == "__main__":
         learning_rate=2e-5,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
-        num_train_epochs=30,
+        num_train_epochs=10, # 30
         weight_decay=0.01,
         # save_total_limit=2,
         logging_dir="./logs",
@@ -201,7 +210,7 @@ if __name__ == "__main__":
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
-            compute_metrics=compute_metrics,
+            compute_metrics=compute_metrics_classification,
         )
     elif task == 'regression':
         trainer = Trainer(
@@ -210,7 +219,7 @@ if __name__ == "__main__":
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
-            compute_metrics=evaluate.load("mse"),
+            compute_metrics=compute_metrics_regression,
         )
     else:
         raise ValueError('task should be either classification or regression')
