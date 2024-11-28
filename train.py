@@ -142,8 +142,8 @@ class CustomRegressionTrainer(Trainer):
 
 
 if __name__ == "__main__":
-    task = 'classification'
-    # task = 'regression'
+    # task = 'classification'
+    task = 'regression'
     data_path = '/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv'
     model_name = 'camembert-base'
     # model_name = 'camembert/camembert-large'
@@ -223,12 +223,13 @@ if __name__ == "__main__":
             compute_metrics=compute_metrics,
         )
     elif task == 'regression':
-        trainer = CustomRegressionTrainer(
+        trainer = Trainer(
             model=model,
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
+            compute_metrics=evaluate.load("mse"),
         )
     else:
         raise ValueError('task should be either classification or regression')
@@ -249,7 +250,9 @@ if __name__ == "__main__":
     # print prediction of the first 10 examples
     predictions = trainer.predict(test_dataset)
     for i in range(20):
-        print("Predicted label :", str(np.argmax(predictions.predictions[i])), "- True label : ", str(test_dataset['labels'][i]), "\tPrediction :", str(predictions.predictions[i]))
-        # predictions.predictions[i] = [-0.19786438  0.15751775  0.16081156 -0.12675774] as a numpy array
-
-    print("Add print")
+        if task == 'classification':
+            print("Predicted label :", str(np.argmax(predictions.predictions[i])), "- True label : ", str(test_dataset['labels'][i]), "\tPrediction :", str(predictions.predictions[i]))
+        elif task == 'regression':
+            print("Predicted score :", str(predictions.predictions[i]), "- True score : ", str(test_dataset['labels'][i]))
+        else:
+            raise ValueError('task should be either classification or regression')
