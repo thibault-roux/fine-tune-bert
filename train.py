@@ -121,11 +121,11 @@ class CustomClassificationTrainer(Trainer):
         # inverse of the distributions
         inverse_distributions = [1/x for x in distributions]
         # normalize the inverse distributions
-        inverse_distributions = [x/sum(inverse_distributions) for x in inverse_distributions]
+        inverse_distributions = [x/sum(inverse_distributions) for x in inverse_distributions] # [0.5815731457118071, 0.05952981095850442, 0.06811047047378495, 0.29078657285590354]
 
         # Custom loss function:
-        class_weights = torch.tensor([inverse_distributions]).to(logits.device)  # Example weights
-        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
+        class_weights = torch.tensor([inverse_distributions]).to(logits.device)  # tensor([[0.5816, 0.0595, 0.0681, 0.2908]], device='cuda:0')
+        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights.squeeze())
         loss = loss_fn(logits, labels)
 
         return (loss, outputs) if return_outputs else loss
@@ -182,7 +182,6 @@ if __name__ == "__main__":
         for i in range(4):
             print(id_to_label[i], ":", len([x for x in dataset['labels'] if x == i]) / len(dataset) * 100, "%")
         print()
-    input()
 
 
 
@@ -199,7 +198,7 @@ if __name__ == "__main__":
         learning_rate=2e-5,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
-        num_train_epochs=10,
+        num_train_epochs=20,
         weight_decay=0.01,
         # save_total_limit=2,
         logging_dir="./logs",
