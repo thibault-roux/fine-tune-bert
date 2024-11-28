@@ -166,25 +166,6 @@ if __name__ == "__main__":
     test_dataset = split_datasets['test']
 
 
-    """
-    TO DELETE AFTER DEBUGGING
-    """
-    # for each set, print the distributions of the labels in percentage
-    for dataset in [train_dataset, eval_dataset, test_dataset]:
-        # print name of the dataset
-        if dataset == train_dataset:
-            print("Train dataset")
-        elif dataset == eval_dataset:
-            print("Eval dataset")
-        else:
-            print("Test dataset")
-        print("Dataset size : ", len(dataset))
-        for i in range(4):
-            print(id_to_label[i], ":", len([x for x in dataset['labels'] if x == i]) / len(dataset) * 100, "%")
-        print()
-
-
-
 
     # batch_size = 16
     batch_size = 64
