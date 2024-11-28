@@ -6,6 +6,7 @@ from transformers import Trainer, TrainingArguments
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+import torch
 
 
 
@@ -92,15 +93,52 @@ def tokenize_function(examples):
 
 
 
-
+# evaluate on classification
 metric = evaluate.load("accuracy")
 def compute_metrics(eval_pred): # for classification
         logits, labels = eval_pred
         predictions = np.argmax(logits, axis=-1)
         # print only the first 10 examples
-        for i in range(10):
+        for i in range(20):
             print("True:", labels[i], "- Predictions:", predictions[i], "- Logits:", logits[i])
         return metric.compute(predictions=predictions, references=labels)
+
+
+# Custom trainer to overwrite the loss function
+class CustomClassificationTrainer(Trainer):
+    def compute_loss(self, model, inputs, num_items_in_batch=None, return_outputs=False):
+        """
+        Custom loss function for training.
+        By default, Trainer uses CrossEntropyLoss for classification.
+        This can be overridden here for custom loss.
+        """
+        labels = inputs.pop("labels")  # Extract labels
+        outputs = model(**inputs)
+        logits = outputs.logits
+
+        # distributions of classes in the training dataset
+        distributions = [4.693, 45.848, 40.072, 9.386]
+        # inverse of the distributions
+        inverse_distributions = [1/x for x in distributions]
+        # normalize the inverse distributions
+        inverse_distributions = [x/sum(inverse_distributions) for x in inverse_distributions]
+
+        # Custom loss function:
+        class_weights = torch.tensor([inverse_distributions]).to(logits.device)  # Example weights
+        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
+        loss = loss_fn(logits, labels)
+
+        return (loss, outputs) if return_outputs else loss
+
+class CustomRegressionTrainer(Trainer):
+    def compute_loss(self, model, inputs, num_items_in_batch=None, return_outputs=False):
+        """
+        Custom loss function for training.
+        By default, Trainer uses MSE for regression.
+        This can be overridden here for custom loss.
+        """
+        raise NotImplementedError("Custom loss function for regression not implemented yet")
+
 
 
 if __name__ == "__main__":
@@ -168,14 +206,35 @@ if __name__ == "__main__":
     )
 
     # Trainer
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
-    )
+    # trainer = Trainer(
+    #     model=model,
+    #     args=training_args,
+    #     train_dataset=train_dataset,
+    #     eval_dataset=eval_dataset,
+    #     tokenizer=tokenizer,
+    #     compute_metrics=compute_metrics,
+    # )
+    if task == 'classification':
+        trainer = CustomClassificationTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+            compute_metrics=compute_metrics,
+        )
+    elif task == 'regression':
+        trainer = CustomRegressionTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+        )
+    else:
+        raise ValueError('task should be either classification or regression')
+
+
 
     # Train model
     trainer.train()
@@ -190,11 +249,9 @@ if __name__ == "__main__":
 
     # print prediction of the first 10 examples
     predictions = trainer.predict(test_dataset)
-    for i in range(10):
+    for i in range(20):
         print("Predicted label :", str(np.argmax(predictions.predictions[i])), "- True label : ", str(test_dataset['labels'][i]), "\tPrediction :", str(predictions.predictions[i]))
         # predictions.predictions[i] = [-0.19786438  0.15751775  0.16081156 -0.12675774] as a numpy array
-        # print the max value of the array
-        print("Max value : ", )
 
 
 
