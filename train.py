@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import torch
+from transformers import EarlyStoppingCallback
 
 
 
@@ -221,17 +222,15 @@ if __name__ == "__main__":
     training_args = TrainingArguments(
         output_dir="./models",
         eval_strategy="epoch",
-        # save_strategy="epoch",
-        save_strategy = "no",
-        metric_for_best_model="loss", # instead of accuracy
+        save_strategy="epoch",
+        save_total_limit = 2,
         load_best_model_at_end=True,
+        metric_for_best_model="loss", # instead of accuracy
         learning_rate=2e-5,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
-        num_train_epochs=30, # 30
+        num_train_epochs=100, # 30
         weight_decay=0.01,
-        # save_total_limit=2,
-        logging_dir="./logs",
     )
 
     # Trainer
@@ -252,6 +251,7 @@ if __name__ == "__main__":
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
             compute_metrics=compute_metrics_classification,
+            callbacks = [EarlyStoppingCallback(early_stopping_patience=3)]
         )
     elif task == 'regression':
         trainer = CustomRegressionTrainer(
@@ -261,6 +261,7 @@ if __name__ == "__main__":
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
             compute_metrics=compute_metrics_regression,
+            callbacks = [EarlyStoppingCallback(early_stopping_patience=3)]
         )
     else:
         raise ValueError('task should be either classification or regression')
