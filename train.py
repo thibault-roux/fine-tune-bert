@@ -8,6 +8,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import torch
 from transformers import EarlyStoppingCallback
+from transformers import AutoTokenizer
 
 
 
@@ -181,8 +182,9 @@ if __name__ == "__main__":
     task = 'classification'
     # task = 'regression'
     data_path = '/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv'
-    model_name = 'camembert-base'
-    # model_name = 'camembert/camembert-large'
+    # model_name = 'camembert-base' # 0.6344086021505376
+    model_name = 'camembert/camembert-large'
+    # model_name = 'almanach/camembertv2-base' # 0.7741935483870968 avec 64 batch size and 0.7096774193548387 avec 16 batch size
 
 
     # Load CamemBERT model
@@ -192,7 +194,8 @@ if __name__ == "__main__":
     # Load data
     dataset = load_data(data_path, task)
     # Load CamemBERT tokenizer
-    tokenizer = CamembertTokenizer.from_pretrained(model_name)
+    # tokenizer = CamembertTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
     # Apply tokenization to dataset
     tokenized_datasets = dataset.map(tokenize_function, batched=True)
     # Stratified split
@@ -216,8 +219,8 @@ if __name__ == "__main__":
 
 
 
-    # batch_size = 16
-    batch_size = 64
+    batch_size = 16
+    # batch_size = 64
     # Training configuration
     training_args = TrainingArguments(
         output_dir="./models",
