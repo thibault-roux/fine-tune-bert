@@ -32,7 +32,10 @@ def load_data(data_path, task):
         dataset = dataset.map(lambda examples: {'labels': label_to_id[examples[label_column_name]]})
     elif task == 'regression':
         label_column_name = 'gold_score_20'
-        dataset = dataset.map(lambda examples: {'labels': float(examples[label_column_name])})
+        min_value = 1
+        max_value = 20
+        # dataset = dataset.map(lambda examples: {'labels': float(examples[label_column_name])})
+        dataset = dataset.map(lambda examples: {'labels': (float(examples[label_column_name]) - min_value) / (max_value - min_value)})
     else:
         raise ValueError('task should be either classification or regression')
     return dataset # dataset contains only a train but it will be splitted later
@@ -90,12 +93,16 @@ def stratified_split(dataset, stratify_column='gold_score_20_label', test_size=0
 def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
 
+# convert regression predictions to the correct scale between min and max
+def convert_regression_predictions(predictions, min_value=1, max_value=20):
+    return predictions * (max_value - min_value) + min_value
 
+# convert regression predictions to the correct scale between min and max
 
 
 # evaluate on classification
 metric_classification = evaluate.load("accuracy")
-def compute_metric_classifications_classification(eval_pred):
+def compute_metrics_classification(eval_pred):
         logits, labels = eval_pred
         predictions = np.argmax(logits, axis=-1)
         # print only the first 10 examples
@@ -109,8 +116,8 @@ def compute_metrics_regression(eval_pred):
         logits, labels = eval_pred
         # print only the first 10 examples
         for i in range(20):
-            print("True:", labels[i], "- Predictions:", logits[i])
-        return metrics_regression.compute(predictions=logits, references=labels)
+            print("True:", convert_regression_predictions(labels[i]), "- Predictions:", convert_regression_predictions(logits[i]))
+        return metric_regression.compute(predictions=logits, references=labels)
 
 
 # Custom trainer to overwrite the loss function
@@ -138,7 +145,18 @@ class CustomClassificationTrainer(Trainer):
         loss = loss_fn(logits, labels)
 
         return (loss, outputs) if return_outputs else loss
+    
+class CustomWeightedMSELoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
 
+    def forward(self, predictions, targets):
+        # Compute weights inversely proportional to target frequency or values
+        weights = torch.where(targets > 10, torch.tensor(2.0), torch.tensor(1.0)).to(predictions.device)
+        mse = (predictions - targets) ** 2
+        weighted_mse = mse * weights
+        return weighted_mse.mean()
+    
 class CustomRegressionTrainer(Trainer):
     def compute_loss(self, model, inputs, num_items_in_batch=None, return_outputs=False):
         """
@@ -146,13 +164,21 @@ class CustomRegressionTrainer(Trainer):
         By default, Trainer uses MSE for regression.
         This can be overridden here for custom loss.
         """
-        raise NotImplementedError("Custom loss function for regression not implemented yet")
+        labels = inputs.pop("labels")
+        outputs = model(**inputs)
+        logits = outputs.logits
+
+        # Custom weighted loss
+        loss_fn = CustomWeightedMSELoss()
+        loss = loss_fn(logits.squeeze(), labels)
+
+        return (loss, outputs) if return_outputs else loss
 
 
 
 if __name__ == "__main__":
-    # task = 'classification'
-    task = 'regression'
+    task = 'classification'
+    # task = 'regression'
     data_path = '/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv'
     model_name = 'camembert-base'
     # model_name = 'camembert/camembert-large'
@@ -174,6 +200,19 @@ if __name__ == "__main__":
     eval_dataset = split_datasets['eval']
     test_dataset = split_datasets['test']
 
+    # normalize for regression
+    if task == 'regression':
+        train_labels = train_dataset
+
+
+    # List all columns except the ones you want to keep
+    columns_to_remove = [col for col in train_dataset.column_names if col not in ['input_ids', 'attention_mask', 'labels']]
+
+    # Remove the unnecessary columns from each split
+    train_dataset = train_dataset.remove_columns(columns_to_remove)
+    eval_dataset = eval_dataset.remove_columns(columns_to_remove)
+    test_dataset = test_dataset.remove_columns(columns_to_remove)
+
 
 
     # batch_size = 16
@@ -182,13 +221,14 @@ if __name__ == "__main__":
     training_args = TrainingArguments(
         output_dir="./models",
         eval_strategy="epoch",
-        save_strategy="epoch",
+        # save_strategy="epoch",
+        save_strategy = "no",
         metric_for_best_model="loss", # instead of accuracy
         load_best_model_at_end=True,
         learning_rate=2e-5,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
-        num_train_epochs=10, # 30
+        num_train_epochs=30, # 30
         weight_decay=0.01,
         # save_total_limit=2,
         logging_dir="./logs",
@@ -204,6 +244,7 @@ if __name__ == "__main__":
     #     compute_metrics=compute_metrics,
     # )
     if task == 'classification':
+        print("Train dataset:", train_dataset)
         trainer = CustomClassificationTrainer(
             model=model,
             args=training_args,
@@ -213,7 +254,7 @@ if __name__ == "__main__":
             compute_metrics=compute_metrics_classification,
         )
     elif task == 'regression':
-        trainer = Trainer(
+        trainer = CustomRegressionTrainer(
             model=model,
             args=training_args,
             train_dataset=train_dataset,
@@ -243,6 +284,6 @@ if __name__ == "__main__":
         if task == 'classification':
             print("Predicted label :", str(np.argmax(predictions.predictions[i])), "- True label : ", str(test_dataset['labels'][i]), "\tPrediction :", str(predictions.predictions[i]))
         elif task == 'regression':
-            print("Predicted score :", str(predictions.predictions[i]), "- True score : ", str(test_dataset['labels'][i]))
+            print("Predicted score :", str(convert_regression_predictions(predictions.predictions[i])), "- True score : ", str(convert_regression_predictions(test_dataset['labels'][i])))
         else:
             raise ValueError('task should be either classification or regression')
