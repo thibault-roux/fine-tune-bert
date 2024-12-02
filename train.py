@@ -9,6 +9,30 @@ from sklearn.model_selection import train_test_split
 import torch
 from transformers import EarlyStoppingCallback
 from transformers import AutoTokenizer
+import wandb
+from transformers import Trainer, TrainingArguments, set_seed
+
+
+
+set_seed(42)
+torch.manual_seed(42)
+torch.cuda.manual_seed_all(42)
+np.random.seed(42)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
+
+wandb.login()
+
+config = {
+    "learning_rate": 2e-5,
+    "epochs": 10,
+    "batch_size": 64,
+    "weight_decay" : 0.01
+    # Add any other hyperparameters you are using
+}
+wandb.init(project="DL_xps", config=config, name="w_%s_%s" %(config["learning_rate"], config["batch_size"]))
+
 
 
 
@@ -183,8 +207,9 @@ if __name__ == "__main__":
     # task = 'regression'
     data_path = '/home/ucl/cental/troux/expe/fine-tune-bert/data/Qualtrics_Annotations_formatB.csv'
     # model_name = 'camembert-base' # 0.6344086021505376
-    model_name = 'camembert/camembert-large'
+    # model_name = 'camembert/camembert-large'
     # model_name = 'almanach/camembertv2-base' # 0.7741935483870968 avec 64 batch size and 0.7096774193548387 avec 16 batch size
+    model_name = 'dangvantuan/sentence-camembert-base'
 
 
     # Load CamemBERT model
@@ -219,21 +244,24 @@ if __name__ == "__main__":
 
 
 
-    batch_size = 16
+    # batch_size = 16
     # batch_size = 64
+    batch_size = wandb.config["batch_size"]
     # Training configuration
     training_args = TrainingArguments(
         output_dir="./models",
         eval_strategy="epoch",
         save_strategy="epoch",
-        save_total_limit = 2,
+        save_total_limit = 1,
         load_best_model_at_end=True,
         metric_for_best_model="loss", # instead of accuracy
-        learning_rate=2e-5,
-        per_device_train_batch_size=batch_size,
-        per_device_eval_batch_size=batch_size,
-        num_train_epochs=100, # 30
-        weight_decay=0.01,
+        seed=42,
+        report_to="wandb",
+        learning_rate=wandb.config["batch_size"],
+        num_train_epochs=wandb.config["batch_size"],
+        per_device_train_batch_size=wandb.config["batch_size"],
+        per_device_eval_batch_size=wandb.config["batch_size"],
+        weight_decay=wandb.config["batch_size"],
     )
 
     # Trainer
@@ -264,7 +292,7 @@ if __name__ == "__main__":
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
             compute_metrics=compute_metrics_regression,
-            callbacks = [EarlyStoppingCallback(early_stopping_patience=3)]
+            callbacks = [EarlyStoppingCallback(early_stopping_patience=5)]
         )
     else:
         raise ValueError('task should be either classification or regression')
@@ -281,6 +309,7 @@ if __name__ == "__main__":
     # Evaluation on test
     metrics = trainer.evaluate(test_dataset)
     print("Test Results : ", metrics)
+    wandb.log({'Test accuracy': metrics['eval_accuracy'], 'Test loss': metrics['eval_loss']})
 
     # print prediction of the first 10 examples
     predictions = trainer.predict(test_dataset)
@@ -291,3 +320,7 @@ if __name__ == "__main__":
             print("Predicted score :", str(convert_regression_predictions(predictions.predictions[i])), "- True score : ", str(convert_regression_predictions(test_dataset['labels'][i])))
         else:
             raise ValueError('task should be either classification or regression')
+    
+
+
+    wandb.finish()
